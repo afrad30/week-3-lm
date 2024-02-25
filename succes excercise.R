@@ -1,5 +1,6 @@
 library("rjags")
-
+library("car")
+data("Anscombe")
 mod_string = " model {
     
     for (i in 1:length(education)) {
@@ -39,26 +40,28 @@ inits1=function(){
 }
 
 mod1=jags.model(textConnection(mod_string), 
-                data=data_jags, inits = inits1)
+                data=data_jags, inits = inits1, n.chains = 3)
 
 update(mod1, 1000)
 
 
-mod1_sim = coda.samples(model = mod1, variable.names = params1, n.iter = 5e3)
+mod1_sim = coda.samples(model = mod1, variable.names = params1, n.iter = 5e4)
 
-mod1_csim = do.call(rbind, mod1_sim)
+mod1_csim = as.mcmc(do.call(rbind, mod1_sim))
 
 #convergens
 
-plot(mod1_sim)
+#plot(mod1_sim)
 
-gelman.diag()
-#gelman.diag(mod_sim)
-autocorr.diag(mod_sim)
+gelman.diag(mod1_sim)# understood, variance between chain and within chain
 
-effectiveSize(mod_sim)
+gelman.plot(mod1_sim)
 
-summary(mod_sim)
+autocorr.diag(mod1_sim)
+
+effectiveSize(mod1_sim)
+
+summary(mod1_sim)
 
 
 # residuals from frequentist
