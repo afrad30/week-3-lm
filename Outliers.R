@@ -19,38 +19,43 @@ plot(lmod)
 
 summary(lmod)
 
-
 # jags, add oil covariate
 dat=na.omit(Leinhardt)
+curve(dnorm(x), from = -5, to=5)
+curve(dt(x, 1), from = -5, to=5, col="red", add=TRUE)# DEGREE OF FREEDOM 1
+
 library(rjags)
 
 
 mod1_string = " model {
     for (i in 1:n) {
-        y[i] ~ dnorm(mu[i], prec)
+        y[i] ~ dt(mu[i], tau, df)
         mu[i] = b[1] + b[2]*log_income[i] + b[3]*is_oil[i]
     }
     
     for (i in 1:3) {
         b[i] ~ dnorm(0.0, 1.0/1.0e6)
     }
+    df =nu + 2.0
+    nu ~ dexp(1.0)
     
-    prec ~ dgamma(5/2.0, 5*10.0/2.0)
-    sig2 = 1.0 / prec
-    sig = sqrt(sig2)
+    tau ~ dgamma(5/2.0, 5*10.0/2.0)
+    
+    sig = sqrt(1.0/tau * df/(df-2))
 } "
 
 set.seed(72)
+
 data1_jags = list(y=dat$loginfant, 
                   n=nrow(dat), 
                   log_income=dat$logincome,
                   is_oil=as.numeric(dat$oil=="yes"))
 
 inits1 = function() {
-  inits = list("b"=rnorm(3,0.0,100.0), "prec"=rgamma(1,1.0,1.0))
+  inits = list("b"=rnorm(3,0.0,100.0), "tau"=rgamma(1,1.0,1.0))
 }
 
-mod2 = jags.model(textConnection(mod1_string), data=data1_jags, inits=inits1, n.chains=3)
+mod3 = jags.model(textConnection(mod1_string), data=data1_jags, inits=inits1, n.chains=3)
 
 update(mod1, 1000) # burn-in
 
@@ -60,6 +65,9 @@ formcmc=do.call(rbind, mod1_sim)
 
 mod1_csim = as.mcmc(formcmc) # combine multiple chains
 
+mod1_csim
+
+plot(mod1_csim)
 # convergence
 gelman.diag(mod1_csim)
 autocorr.diag(mod1_csim)
@@ -88,29 +96,32 @@ qqnorm(resid(lmod))
 # & residuals
 X = cbind(rep(1.0, data1_jags$n), data1_jags$log_income, data1_jags$is_oil)
 
-head(X) #creat a matrix of (bnot, xi, zi) 
+head(X) #creat a matrix of (bnot, xi, zi)
 
 pm_params1 = colMeans(mod1_csim) # posterior mean of every column, in table form
 
 yhat = drop(X %*% pm_params1[1:3])# y value is equal bnot+b1xi+b2zi# matrix mutiplication, bnot+ b1*INCOME+SIG
-yhat
-yhat1 = drop(X %*% summary_output$statistics[1:3])
-yhat1
 resid1 = data1_jags$y - yhat
-resid2 = data1_jags$y - yhat1
-plot(resid1) # against data index
-plot(resid2)
+plot(resid1)
 plot(yhat, resid1)
-plot(yhat, resid2)
-qqnorm(resid2)
+qqnorm(resid1)
+
+yhat1 = drop(X %*% summary_output$statistics[1:3])
+resid2 = data1_jags$y - yhat1
+plot(resid2)
+plot(yhat1, resid2)
+
+
 sd(resid1)
-  par(mfrow=c(2,1))
+par(mfrow=c(2,1))
 
 (rownames(dat)[order(resid1, decreasing = TRUE)])
 head(rownames(dat)[order(resid1, decreasing = TRUE)])
 
 
-dic.samples(mod2, n.iter = 1000)
+
+dic.samples(mod3, n.iter = 1000)
+
 
 
 

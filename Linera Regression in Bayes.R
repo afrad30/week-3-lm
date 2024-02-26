@@ -83,5 +83,7 @@ plot(yhat1, resid1)
 
 qqnorm(resid1)
 
+dic.samples(mod1, n.iter = 1000)
+
 
 
